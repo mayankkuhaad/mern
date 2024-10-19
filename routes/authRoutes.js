@@ -17,10 +17,9 @@ const User = require('../models/User.js');
 const router = express.Router();
 
 router.post('/register', async (req, res) => {
-    const { name, email, password, role } = req.body; // Assume the role is passed from the client
+    const { name, email, password, role } = req.body; 
 
     try {
-        // Check if the user already exists
         const existingUser = await User.findOne({ where: { email } });
         if (existingUser) {
             return res.status(400).json({ message: 'User already exists' });
@@ -34,12 +33,11 @@ router.post('/register', async (req, res) => {
             name,
             email,
             password: hashedPassword,
-            role: role || 'user', // Default to 'user' if no role is provided
-            isVerified: false // Email verification pending
+            role: role || 'user',
+            isVerified: false 
         });
         const verificationToken = jwt.sign({ id: newUser.id }, process.env.JWT_SECRET, { expiresIn: '1h' });
 
-        // Send verification email
         await sendVerificationEmail(email, verificationToken);
 
         res.json({
@@ -54,7 +52,6 @@ router.post('/register', async (req, res) => {
         });
 
 
-        // Send email verification, etc.
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Server error' });
@@ -73,7 +70,6 @@ router.post('/register', async (req, res) => {
         return res.status(400).json({ message: 'Invalid token' });
       }
   
-      // Mark the user as verified
       user.isVerified = true;
       await user.save();
   
@@ -90,26 +86,22 @@ router.post('/register', async (req, res) => {
     const { email, password } = req.body;
 
     try {
-        // Find the user by email
         const user = await User.findOne({ where: { email } });
 
         if (!user) {
             return res.status(400).json({ message: 'Invalid email or password.' });
         }
 
-        // Check if the user is verified
         if (!user.isVerified) {
             return res.status(400).json({ message: 'Please verify your email to login.' });
         }
 
-        // Compare passwords
         const isMatch = await bcrypt.compare(password, user.password);
 
         if (!isMatch) {
             return res.status(400).json({ message: 'Invalid email or password.' });
         }
 
-        // Generate JWT token
         const token = jwt.sign({ id: user.id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '1h' });
 
         res.json({ message: 'Login successful', token , role: user.role});
@@ -136,7 +128,7 @@ router.get('/admin', authenticateToken, authorize('admin'), (req, res) => {
 router.get('/users', authenticateToken, authorize('admin'), async (req, res) => {
     try {
         const users = await User.findAll({
-            attributes: ['id', 'name', 'email', 'role'], // Specify the attributes you want to return
+            attributes: ['id', 'name', 'email', 'role'], 
         });
         res.json(users);
     } catch (error) {
@@ -145,12 +137,10 @@ router.get('/users', authenticateToken, authorize('admin'), async (req, res) => 
     }
 });
 
-// In your auth routes file (e.g., auth.js)
 
-// Route to update user details
 router.put('/users/:id', authenticateToken, authorize('admin'), async (req, res) => {
     const { id } = req.params;
-    const { name, email, role } = req.body; // Extract fields from request body
+    const { name, email, role } = req.body; 
 
     if (role && !['admin', 'user'].includes(role)) {
         return res.status(400).json({ message: 'Invalid role' });
@@ -160,12 +150,11 @@ router.put('/users/:id', authenticateToken, authorize('admin'), async (req, res)
         const user = await User.findByPk(id);
         if (!user) return res.status(404).json({ message: 'User not found' });
 
-        // Only update fields that are provided in the request body
         if (name) user.name = name;
         if (email) user.email = email;
         if (role) user.role = role;
 
-        await user.save(); // Save changes to the database
+        await user.save();
 
         res.json({ message: 'User updated successfully', user });
     } catch (error) {
@@ -173,7 +162,6 @@ router.put('/users/:id', authenticateToken, authorize('admin'), async (req, res)
         res.status(500).json({ message: 'Internal server error' });
     }
 });
-// Route to delete a user
 router.delete('/users/:id', authenticateToken, authorize('admin'), async (req, res) => {
     const { id } = req.params;
 

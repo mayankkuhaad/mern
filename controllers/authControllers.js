@@ -32,10 +32,8 @@ exports.sendResetEmail = async (req, res) => {
           return res.status(404).json({ message: 'User not found' });
       }
 
-      // Generate reset token (you may want to set an expiration time)
       const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET, { expiresIn: '1h' });
       
-      // Send email logic here (using Nodemailer)
       const transporter = nodemailer.createTransport({
           service: 'gmail',
           auth: {
@@ -44,7 +42,7 @@ exports.sendResetEmail = async (req, res) => {
           },
       });
 
-      const resetLink = `http://localhost:5000/api/auth/reset-password/${token}`;
+      const resetLink = `http://localhost:3000/reset-password/${token}`;
       await transporter.sendMail({
           to: email,
           subject: 'Password Reset Request',
@@ -58,38 +56,36 @@ exports.sendResetEmail = async (req, res) => {
   }
 };
 
-// Function to reset password
 exports.resetPassword = async (req, res) => {
-  const { token } = req.params;
-  const { newPassword } = req.body;
-
-  try {
+    const { token } = req.params;
+    const { newPassword } = req.body;
+  
+    try {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
       const user = await User.findByPk(decoded.id);
-
+  
       if (!user) {
-          return res.status(404).json({ message: 'User not found' });
+        return res.status(404).json({ message: 'User not found' });
       }
-
-      // Hash the new password and update it
-      user.password = newPassword; // Ensure you hash this before saving
+  
+      const hashedPassword = await bcrypt.hash(newPassword, 10);
+  
+      user.password = hashedPassword;
       await user.save();
-
+  
       return res.status(200).json({ message: 'Password reset successfully' });
-  } catch (error) {
+    } catch (error) {
       console.error(error);
       return res.status(500).json({ message: 'Error resetting password' });
-  }
-};
-
+    }
+  };
 
 exports.getUserProfile = async (req, res) => {
     try {
-        // Get user ID from JWT token (you should have a middleware to authenticate)
-        const userId = req.user.id; // Assuming you have middleware that adds user to req
+        const userId = req.user.id; 
 
         const user = await User.findByPk(userId, {
-            attributes: ['id', 'name', 'email', 'role', 'isVerified'], // Select fields to return
+            attributes: ['id', 'name', 'email', 'role', 'isVerified'], 
         });
 
         if (!user) {
@@ -104,7 +100,7 @@ exports.getUserProfile = async (req, res) => {
 };
 
 exports.updateUserProfile = async (req, res) => {
-    const { name, email, password } = req.body; // Get fields from request body
+    const { name, email, password } = req.body; 
 
     try {
         const userId = req.user.id;
@@ -114,16 +110,14 @@ exports.updateUserProfile = async (req, res) => {
             return res.status(404).json({ message: 'User not found' });
         }
 
-        // Update user fields
         user.name = name || user.name;
         user.email = email || user.email;
 
-        // Update password if provided
         if (password) {
-            user.password = await bcrypt.hash(password, 10); // Hash the new password
+            user.password = await bcrypt.hash(password, 10);
         }
 
-        await user.save(); // Save the updated user
+        await user.save();
 
         return res.status(200).json({ message: 'Profile updated successfully' });
     } catch (error) {
