@@ -125,7 +125,7 @@ router.get('/admin', authenticateToken, authorize('admin'), (req, res) => {
     res.json({ message: 'Welcome Admin' });
 });
 
-router.get('/users', authenticateToken, authorize('admin'), async (req, res) => {
+router.get('/users', authenticateToken, async (req, res) => {
     try {
         const users = await User.findAll({
             attributes: ['id', 'name', 'email', 'role'], 
