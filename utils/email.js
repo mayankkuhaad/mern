@@ -1,15 +1,13 @@
 const nodemailer = require('nodemailer');
 
-// Configure your email transport
 const transporter = nodemailer.createTransport({
-  service: 'Gmail', // Use your email service provider
+  service: 'Gmail', 
   auth: {
-    user: process.env.EMAIL_USER, // Your email address
-    pass: process.env.EMAIL_PASS, // Your email password or app password
+    user: process.env.EMAIL_USER, 
+    pass: process.env.EMAIL_PASS, 
   },
 });
 
-// Function to send verification email
 const sendVerificationEmail = async (email, token) => {
   const verificationUrl = `http://localhost:3000/verify-email/${token}`;
   const mailOptions = {
