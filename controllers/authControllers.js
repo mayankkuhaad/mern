@@ -158,33 +158,6 @@ exports.getUserProfile = async (req, res) => {
     }
 };
 
-// exports.updateUserProfile = async (req, res) => {
-//     const { name, email, password } = req.body; 
-
-//     try {
-//         const userId = req.user.id;
-
-//         const user = await User.findByPk(userId);
-//         if (!user) {
-//             return res.status(404).json({ message: 'User not found' });
-//         }
-
-//         user.name = name || user.name;
-//         user.email = email || user.email;
-
-//         if (password) {
-//             user.password = await bcrypt.hash(password, 10);
-//         }
-
-//         await user.save();
-
-//         return res.status(200).json({success: true, message: 'Profile updated successfully' });
-//     } catch (error) {
-//         console.error(error);
-//         return res.status(500).json({ message: 'Error updating profile' });
-//     }
-// };
-
 exports.updateMyProfile = async (req, res) => {
   const { name, email, password } = req.body;
   const file = req.file;
@@ -198,10 +171,7 @@ exports.updateMyProfile = async (req, res) => {
 
       let cloudinaryResult = null;
       if (file) {
-          // Delete the old photo from Cloudinary if it exists
-          // if (user.photoPublicId) {
-          //     await deleteFromCloudinary(user.photoPublicId);
-          // }
+          
 
           cloudinaryResult = await uploadBufferToCloudinary(file.buffer, 'user_photos');
           user.photoUrl = cloudinaryResult?.secure_url;
@@ -299,26 +269,21 @@ exports.updateUserProfile =  async (req, res) => {
   const { name, email, role } = req.body;
   const file = req.file;
 
-  // Validate role if provided
   if (role && !['admin', 'user'].includes(role)) {
       return res.status(400).json({ message: 'Invalid role' });
   }
 
   try {
-      // Fetch user by ID
       const user = await User.findByPk(id);
       if (!user) {
           return res.status(404).json({ message: 'User not found' });
       }
 
-      // Update user fields
       if (name) user.name = name;
       if (email) user.email = email;
       if (role) user.role = role;
 
-      // Handle file upload if provided
       if (file) {
-          // Delete old photo from Cloudinary (if applicable)
           if (user.photoPublicId) {
               await cloudinary.uploader.destroy(user.photoPublicId);
           }
@@ -328,10 +293,9 @@ exports.updateUserProfile =  async (req, res) => {
           user.photoPublicId = cloudinaryResult.public_id;
       }
 
-      // Save changes
       await user.save();
+      await redisClient.del('allUsers');
 
-      // Send updated user data
       res.json({ success: true, message: 'User updated successfully', user });
   } catch (error) {
       console.error('Error updating user:', error);
@@ -347,6 +311,8 @@ exports.deleteUser =  async (req, res) => {
       if (!user) return res.status(404).json({ message: 'User not found' });
 
       await user.destroy();
+     await redisClient.del('allUsers');
+
       res.json({success: true, message: 'User deleted successfully' });
   } catch (error) {
       console.error(error);
