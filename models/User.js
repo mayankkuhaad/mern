@@ -29,6 +29,14 @@ const User = sequelize.define('User', {
     type: DataTypes.BOOLEAN,
     defaultValue: false,
   },
+  photoPublicId: {
+    type: DataTypes.STRING,
+    allowNull: false,
+  }, 
+  photoUrl: {
+    type: DataTypes.STRING,
+    allowNull: false,
+  },
 });
 
 module.exports = User;

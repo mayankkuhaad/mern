@@ -5,6 +5,7 @@ const jwt = require('jsonwebtoken');
 const { sendVerificationEmail } = require('../utils/email.js');
 const nodemailer = require('nodemailer');
 const { sendResetEmail, resetPassword , getUserProfile, updateUserProfile } = require('../controllers/authControllers.js');
+const { Readable } = require('stream');
 
 const { getUserById } = require('../controllers/usersController.js');
 
@@ -12,51 +13,93 @@ const authenticateToken = require('../middleware/authenticationMiddleware.js');
 
 const authorize = require('../middleware/authorize.js');
 
-const bcrypt = require('bcryptjs');
 const User = require('../models/User.js');
 const router = express.Router();
 
-router.post('/register', async (req, res) => {
-    const { name, email, password, role } = req.body; 
+const bcrypt = require('bcryptjs');
+const multer = require('multer');
+const storage = multer.memoryStorage();
+const upload = multer({ storage });
+const cloudinary = require('cloudinary').v2;
 
-    try {
-        const existingUser = await User.findOne({ where: { email } });
-        if (existingUser) {
-            return res.status(400).json({ message: 'User already exists' });
+
+cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET,
+  });
+
+  const uploadBufferToCloudinary = (buffer, folder) => {
+    return new Promise((resolve, reject) => {
+      const stream = cloudinary.uploader.upload_stream(
+        { folder },
+        (error, result) => {
+          if (error) {
+            reject(error);
+          } else {
+            resolve(result);
+          }
         }
+      );
+  
+      Readable.from(buffer).pipe(stream);
+    });
+  };
+  
 
-        // Hash the password
-        const hashedPassword = await bcrypt.hash(password, 10);
-
-        // Create the new user
-        const newUser = await User.create({
-            name,
-            email,
-            password: hashedPassword,
-            role: role || 'user',
-            isVerified: false 
-        });
-        const verificationToken = jwt.sign({ id: newUser.id }, process.env.JWT_SECRET, { expiresIn: '1h' });
-
-        await sendVerificationEmail(email, verificationToken);
-
-        res.json({
-            message: 'User registered successfully. Please verify your email.',
-            user: {
-                id: newUser.id,
-                role: newUser.role,
-                isVerified: newUser.isVerified,
-                name: newUser.name,
-                email: newUser.email,
-            }
-        });
-
-
+// Register route
+router.post('/register', upload.single('photo'), async (req, res) => {
+    const { name, email, password } = req.body;
+    const file = req.file; 
+    try {
+      const existingUser = await User.findOne({ where: { email } });
+      if (existingUser) {
+        return res.status(400).json({ message: 'User already exists' });
+      }
+  
+      let cloudinaryResult = null;
+      if (file) {
+        cloudinaryResult = await uploadBufferToCloudinary(file.buffer, 'user_photos');
+      }
+  
+      const hashedPassword = await bcrypt.hash(password, 10);
+  
+      const newUser = await User.create({
+        name,
+        email,
+        password: hashedPassword,
+        role: 'user',
+        isVerified: false,
+        photoUrl: cloudinaryResult?.secure_url || null,
+        photoPublicId: cloudinaryResult?.public_id || null,
+      });
+  
+      const verificationToken = jwt.sign(
+        { id: newUser.id },
+        process.env.JWT_SECRET,
+        { expiresIn: '1h' }
+      );
+  
+      await sendVerificationEmail(email, verificationToken);
+  
+      res.json({
+        success: true,
+        message: 'User registered successfully. Please verify your email.',
+        user: {
+          id: newUser.id,
+          role: newUser.role,
+          isVerified: newUser.isVerified,
+          name: newUser.name,
+          email: newUser.email,
+          photoUrl: cloudinaryResult?.secure_url,
+          photoPublicId: cloudinaryResult?.public_id,
+        },
+      });
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Server error' });
+      console.error('Error:', error);
+      res.status(500).json({ message: 'Server error' });
     }
-});
+  });
 
 
   router.get('/verify-email', async (req, res) => {
@@ -73,7 +116,7 @@ router.post('/register', async (req, res) => {
       user.isVerified = true;
       await user.save();
   
-      res.status(200).json({ message: 'Email verified successfully!' });
+      res.status(200).json({success:true, message: 'Email verified successfully!' });
     } catch (error) {
       console.error(error);
       res.status(500).json({ message: 'Internal server error' });
@@ -104,7 +147,7 @@ router.post('/register', async (req, res) => {
 
         const token = jwt.sign({ id: user.id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '1h' });
 
-        res.json({ message: 'Login successful', token , role: user.role});
+        res.json({ success: true, message: 'Login successful', token ,user : user});
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Server error' });
